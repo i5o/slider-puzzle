@@ -18,13 +18,10 @@
 # own creations we would love to hear from you at info@WorldWideWorkshop.org !
 #
 
-import pygtk
-pygtk.require('2.0')
-import gtk, gobject
-import pango
+from gi.repository import Gtk, GObject, Pango, GdkPixbuf, Gdk
 import md5
 import logging
-
+import tempfile
 from mamamedia_modules import utils
 
 #from utils import load_image, calculate_matrix, debug, SliderCreator, trace
@@ -57,13 +54,18 @@ def calculate_matrix (pieces):
     return rows*cols, rows, cols
 
 
-class SliderCreator (gtk.gdk.Pixbuf):
+class SliderCreator (GdkPixbuf.Pixbuf):
     def __init__ (self, width, height, fname=None, tlist=None): #tlist):
         if width == -1:
             width = 564
         if height == -1:
             height = 564
-        super(SliderCreator, self).__init__(gtk.gdk.COLORSPACE_RGB, False, 8, width, height)
+        super(SliderCreator, self).__init__()
+        self.set_property('colorspace', GdkPixbuf.Colorspace.RGB)
+        self.set_property('has-alpha',  False)
+        self.set_property('bits-per-sample', 8)
+        self.set_property('width', width)
+        self.set_property('height', height)
         if tlist is None:
           items = []
           cmds = file(fname).readlines()
@@ -90,16 +92,17 @@ class SliderCreator (gtk.gdk.Pixbuf):
         return fname.lower().endswith('.sequence')
 
     def prepare_stringed (self, rows, cols):
+        """
         # We use a Pixmap as offscreen drawing canvas
-        cm = gtk.gdk.colormap_get_system()
-        pm = gtk.gdk.Pixmap(None, self.width, self.height, cm.get_visual().depth)
+        cm = Gdk.colormap_get_system()
+        pm = Gdk.Pixmap(None, self.width, self.height, cm.get_visual().depth)
         #pangolayout = pm.create_pango_layout("")
         font_size = int(self.width / cols / 4)
-        l = gtk.Label()
-        pangolayout = pango.Layout(l.create_pango_context())
-        pangolayout.set_font_description(pango.FontDescription("sans bold %i" % font_size))
+        l = Gtk.Label()
+        pangolayout = Pango.Layout(l.create_pango_context())
+        pangolayout.set_font_description(Pango.FontDescription("sans bold %i" % font_size))
         gc = pm.new_gc()
-        gc.set_colormap(gtk.gdk.colormap_get_system())
+        gc.set_colormap(Gdk.colormap_get_system())
         color = cm.alloc_color('white')
         gc.set_foreground(color)
         pm.draw_rectangle(gc, True, 0, 0, self.width, self.height)
@@ -120,6 +123,8 @@ class SliderCreator (gtk.gdk.Pixbuf):
                 pe = pe[1][2]/2, pe[1][3]/2
                 pm.draw_layout(gc, px + (sw / 2) - pe[0],  py + (sh / 2) - pe[1], pangolayout)
         self.get_from_drawable(pm, cm, 0, 0, 0, 0, -1, -1)
+        """
+        pass
 
 utils.register_image_type(SliderCreator)
 
@@ -406,19 +411,19 @@ class SliderPuzzleMap (object):
 # Widget Definition
 ###
 
-class SliderPuzzleWidget (gtk.Table):
-    __gsignals__ = {'solved' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-                    'shuffled' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-                    'moved' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),}
+class SliderPuzzleWidget (Gtk.Table):
+    __gsignals__ = {'solved' : (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+                    'shuffled' : (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+                    'moved' : (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),}
     
     def __init__ (self, pieces=9, width=480, height=480):
         self.jumbler = SliderPuzzleMap(pieces, self.jumblermap_piece_move_cb)
         # We take this from the jumbler object because it may have altered our requested value
-        gtk.Table.__init__(self, self.jumbler.rowsize, self.jumbler.colsize)
-        self.image = None #gtk.Image()
+        Gtk.Table.__init__(self, self.jumbler.rowsize, self.jumbler.colsize)
+        self.image = None #Gtk.Image()
         self.width = width
         self.height = height
-        self.set_size_request(width, height)
+        self.set_size_request(0, 0) # min size
         self.filename = None
 
     def prepare_pieces (self):
@@ -428,32 +433,38 @@ class SliderPuzzleWidget (gtk.Table):
         #    pb = self.image.get_pixbuf()
         #if self.image is None or pb is None:
             for i in range(self.jumbler.pieces):
-                self.pieces.append(gtk.Button(str(i+1)))
+                self.pieces.append(Gtk.Button(str(i+1)))
                 self.pieces[-1].connect("button-release-event", self.process_mouse_click, i+1)
                 self.pieces[-1].show()
         else:
             if isinstance(self.image, SliderCreator):
                 # ask for image creation
                 self.image.prepare_stringed(self.jumbler.rowsize, self.jumbler.colsize)
-        
-            w = self.image.get_width() / self.jumbler.colsize
-            h = self.image.get_height() / self.jumbler.rowsize
+            w = self.image.get_width() / self.jumbler.colsize - \
+                self.jumbler.colsize * 11
+            h = self.image.get_height() / self.jumbler.rowsize - \
+                self.jumbler.rowsize * 11
             for y in range(self.jumbler.rowsize):
                 for x in range(self.jumbler.colsize):
-                    img = gtk.Image()
-                    img.set_from_pixbuf(self.image.subpixbuf(x*w, y*h, w-1, h-1))
+                    img = Gtk.Image()
+                    img.set_from_pixbuf(self.image.new_subpixbuf(x*w, y*h, w-1, h-1))
                     img.show()
-                    self.pieces.append(gtk.EventBox())
+                    self.pieces.append(Gtk.EventBox())
                     self.pieces[-1].add(img)
                     self.pieces[-1].connect("button-press-event", self.process_mouse_click, (y*self.jumbler.colsize)+x+1)
                     self.pieces[-1].show()
             self.set_row_spacings(1)
             self.set_col_spacings(1)
 
+    # An intermediate remove method, to absorb the second parameter from
+    # the foreach call.
+    def remove_itm(self, cell, rubbish):
+        self.remove(cell)
+
     @utils.trace
     def full_refresh (self):
         # Delete everything
-        self.foreach(self.remove)
+        self.foreach(self.remove_itm, None)
         self.prepare_pieces()
         # Add the pieces in their respective places
         for y in range(self.jumbler.rowsize):
@@ -469,7 +480,7 @@ class SliderPuzzleWidget (gtk.Table):
     def process_key (self, w, e):
         if self.get_parent() == None:
             return False
-        k = gtk.gdk.keyval_name(e.keyval)
+        k = Gdk.keyval_name(e.keyval)
         if k in up_key:
             self.jumbler.do_move(SLIDE_UP)
             return True
@@ -542,7 +553,7 @@ class SliderPuzzleWidget (gtk.Table):
         f = file(fn, 'w+b')
         f.write(image)
         f.close()
-        i = gtk.Image()
+        i = Gtk.Image()
         i.set_from_file(fn)
         os.remove(fn)
         self.image = i.get_pixbuf()
@@ -551,28 +562,33 @@ class SliderPuzzleWidget (gtk.Table):
     def show_image (self):
         """ Shows the full image, used as visual clue for solved puzzle """
         # Delete everything
-        self.foreach(self.remove)
+        self.foreach(self.remove_itm, None)
         if hasattr(self, 'pieces'):
             del self.pieces
         # Resize to a single cell and use that for the image
         self.resize(1,1)
-        img = gtk.Image()
+        img = Gtk.Image()
         img.set_from_pixbuf(self.image)
         self.attach(img, 0,1,0,1)
         img.show()
 
+    # Intermediate function to absorb extra parameters sent in by
+    # save_to_callbackv
+
     def get_image_as_png (self, cb=None):
         if self.image is None:
             return None
-        rv = None
-        if cb is None:
-            rv = StringIO()
-            cb = rv.write
-        self.image.save_to_callback(cb, "png")
-        if rv is not None:
-            return rv.getvalue()
-        else:
-            return True
+        # save_to_streamv is missing entirely,
+        # save_to_bufferv appears to be unusable,
+        # and it looks like save_to_callback's data is being truncated on NULL.
+        # Check http://ubuntuforums.org/showthread.php?t=1877793
+        # XXX: Hack
+        tmp_file = tempfile.NamedTemporaryFile()
+        tmp_file_name = tmp_file.name
+        self.image.savev(tmp_file_name, "png", [], [])
+        pb_s = GdkPixbuf.Pixbuf.new_from_file(tmp_file_name).to_string()
+        tmp_file.close()
+        return pb_s
 
     def _freeze (self, journal=True):
         """ returns a json writable object representation capable of being used to restore our current status """

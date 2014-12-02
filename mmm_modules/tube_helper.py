@@ -20,8 +20,8 @@
 
 import telepathy
 #import telepathy.client
-from sugar.presence.tubeconn import TubeConnection
-from sugar.presence import presenceservice
+from sugar3.presence.tubeconn import TubeConnection
+from sugar3.presence import presenceservice
 #import dbus
 import logging
 logger = logging.getLogger('tube_helper')
@@ -42,8 +42,7 @@ class TubeHelper (object):
 
         #bus = dbus.Bus()
 
-
-        name, path = self.pservice.get_preferred_connection()
+        name, path = self.pservice.get_preferred_connection() or (None, None)
         self.tp_conn_name = name
         self.tp_conn_path = path
         #self.conn = telepathy.client.Connection(name, path)

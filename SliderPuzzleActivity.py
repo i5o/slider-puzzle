@@ -19,10 +19,11 @@
 #
 
 # init gthreads before using abiword
-import gobject
-gobject.threads_init()
+from gi.repository import GObject
+GObject.threads_init()
 
-from sugar.activity.activity import Activity, ActivityToolbox, get_bundle_path
+from sugar3.activity.activity import Activity, get_bundle_path
+from sugar3.activity.widgets import ActivityToolbar, StopButton
 from gettext import gettext as _
 from SliderPuzzleUI import SliderPuzzleUI
 from mamamedia_modules import TubeHelper
@@ -309,10 +310,16 @@ class SliderPuzzleActivity(Activity, TubeHelper):
         os.chdir(get_bundle_path())
         self.connect('destroy', self._destroy_cb)
 
-        toolbox = ActivityToolbox(self)
-        self.set_toolbox(toolbox)
+        toolbox = ActivityToolbar(self)
+
+
+        stop_button = StopButton(self)
+        toolbox.insert(stop_button, -1)
+        stop_button.show()
+
+        self.set_toolbar_box(toolbox)
         toolbox.show()
-        title_widget = toolbox._activity_toolbar.title
+        title_widget = toolbox.title
         title_widget.set_size_request(title_widget.get_layout().get_pixel_size()[0] + 20, -1)
 		
         self.ui = SliderPuzzleUI(self)
